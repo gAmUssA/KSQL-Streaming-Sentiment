@@ -1,0 +1,51 @@
+plugins {
+    id 'java'
+}
+
+group 'danopkeefe.ksql'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+    maven { url "http://packages.confluent.io/maven/" }
+    ivy {
+        url 'http://nlp.stanford.edu/software'
+        layout 'pattern' , {
+            artifact '[organization]-[revision]-[module].[ext]'
+        }
+    }
+}
+
+dependencies {
+    compile group: 'io.confluent.ksql', name: 'ksql-udf', version: '5.2.1'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.9'
+    compile group: 'edu.stanford.nlp', name: 'stanford-corenlp', version: '3.9.2'
+    compile 'stanford-english-corenlp:models:2018-10-05@jar'
+    testCompile group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.4.2'
+    testRuntime group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.4.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'package danopkeefe.ksql.udf.Sentiment'
+        )
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+task copyJar(type: Copy) {
+    from jar
+    into "$project.ext.ksql_extension_dir"
+}
+
+copyJar.dependsOn jar
+build.dependsOn copyJar
