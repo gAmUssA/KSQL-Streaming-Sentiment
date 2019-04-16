@@ -543,3 +543,11 @@ We could use a slightly different approach from the aforementioned to monitor se
 The UDF we created for determining sentiment is now available for use with all of the streams in your pipelines via KSQL.  The UDF only cares about the type of its input parameters.  We could use the UDF with any other stream of events in our pipeline.
 
 Enriching our streams with sentiment analysis via KSQL UD(A)Fs has a surprisingly low barrier of entry.  Using Confluent Platform along with ready-made Connector Plugins from Confluent Hub enables us to incorporate sentiment analysis into our even streams in under 30 minutes.  Of course it helps to be standing on the shoulders of giants like those Stanford!
+
+### Building the project
+A fat JAR containing the sentiment UDF can be built as follows.
+```bash
+git clone https://github.com/danopkeefe/KSQL-Streaming-Sentiment.git
+cd KSQL-Streaming-Sentiment
+./gradlew jar
+```
