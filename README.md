@@ -34,8 +34,8 @@ Below is a sample of the results.
 The sample includes the `CONCAT` and `MAX` functions used within the hypothetical KSQL query above.  Each of the functions has a type; either `scalar` or `aggregate`.  Scalar types operate on a single row of data and return a single value.  Aggregate functions operate on multiple rows of data but also return a single result.
 
 `DESCRIBE FUNCTION [NAME]` can be used to see the detail for each function.
-<details>
-  <summary>`DESCRIBE FUNCTION CONCAT;`</summary>
+<details><summary>`DESCRIBE FUNCTION CONCAT;`</summary>
+
 ```json
 {
   "@type": "describe_function",
@@ -72,8 +72,8 @@ The sample includes the `CONCAT` and `MAX` functions used within the hypothetica
 ```
 </details>
 
-<details>
-  <summary>`DESCRIBE FUNCTION MAX;`</summary>
+<details><summary>`DESCRIBE FUNCTION MAX;`</summary>
+
 ```json
 {
   "@type": "describe_function",
@@ -152,8 +152,8 @@ In case you do not have [Confluent Platform](https://docs.confluent.io/current/p
 Since this tutorial builds from the Confluent Platform quick start, ensure that you have [created](https://docs.confluent.io/current/quickstart/ce-docker-quickstart.html#step-2-create-kafka-topics) the `pageviews` and `users` topics and ensure that you have [generated](https://docs.confluent.io/current/quickstart/ce-docker-quickstart.html#step-3-install-a-kafka-connector-and-generate-sample-data) the sample data.
 
 The following section contains snippets that may save some time in case you are already familiar with the quick start content.  Specifically, the snippets cover steps 3 & 4.  Note that this has only been validated on Confluent Platform (Docker).
-<details>
-  <summary>Quickerstart</summary>
+
+<details><summary>Quickerstart</summary>
 
 [Step 3](https://docs.confluent.io/current/quickstart/ce-docker-quickstart.html#step-3-install-a-kafka-connector-and-generate-sample-data):  Install a Kafka Connector and Generate Sample Data
 
@@ -384,7 +384,7 @@ CREATE STREAM TWITTER_STATUS (
 ) WITH (KAFKA_TOPIC='twitter_01',VALUE_FORMAT='JSON');
 ```
 
-Now can use test our crude Sentiment UDF along with a few other built-in UDFs on the content of the tweets as they stream in.
+Now we can use test our crude Sentiment UDF along with a few other built-in UDFs on the content of the tweets as they stream in.
 ```sql
 SELECT EXTRACTJSONFIELD(user,'$.ScreenName') as `ScreenName`,EXTRACTJSONFIELD(user,'$.FollowersCount') as `FollowersCount`, SENTIMENT(TEXT) as `TweetSentiment`, Text as `Tweet`
 FROM TWITTER_STATUS
@@ -392,102 +392,100 @@ WHERE
   LANG='en'
 LIMIT 50;
 ```
-Now we can
-
 
 Since everything we need for sentiment analysis on our Twitter event stream is now in place, let's circle back and see if we can make our `SENTIMENT()` UDF a little less naive.  Since our UDF is just plain old Java, we can easily drop in any Java library we'd like.  That means we can drop in the [Stanford CoreNLP](https://stanfordnlp.github.io/CoreNLP/) Java library, which includes sentiment analysis.  We can simply bundle the new dependencies into our UDFs JAR file.  Here is a slightly better implementation of `SentimentUdf.java` that uses the Stanford CoreNLP library.
-<details>
-  <summary>SentimentUdf</summary>
-    ```java
-    
-    package danopkeefe.ksql.udf;
 
-    import edu.stanford.nlp.ling.CoreAnnotations;
-    import edu.stanford.nlp.neural.rnn.RNNCoreAnnotations;
-    import edu.stanford.nlp.pipeline.Annotation;
-    import edu.stanford.nlp.pipeline.StanfordCoreNLP;
-    import edu.stanford.nlp.sentiment.SentimentCoreAnnotations;
-    import edu.stanford.nlp.trees.Tree;
-    import edu.stanford.nlp.util.CoreMap;
-    import io.confluent.ksql.function.udf.Udf;
-    import io.confluent.ksql.function.udf.UdfDescription;
-    import io.confluent.ksql.function.udf.UdfParameter;
+<details><summary>SentimentUdf</summary>
 
-    import java.util.*;
+```java
+package danopkeefe.ksql.udf;
 
-    @UdfDescription(name = "sentiment", description = "Determine sentiment as an Integer [-2,2]")
-    public class SentimentUdf {
+import edu.stanford.nlp.ling.CoreAnnotations;
+import edu.stanford.nlp.neural.rnn.RNNCoreAnnotations;
+import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.pipeline.StanfordCoreNLP;
+import edu.stanford.nlp.sentiment.SentimentCoreAnnotations;
+import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.util.CoreMap;
+import io.confluent.ksql.function.udf.Udf;
+import io.confluent.ksql.function.udf.UdfDescription;
+import io.confluent.ksql.function.udf.UdfParameter;
 
-        @Udf(description = "Determine value of String")
-        public Integer sentiment(@UdfParameter("string") final String string) {
-            return getAverageSentiment(string).getValue();
-        }
+import java.util.*;
+
+@UdfDescription(name = "sentiment", description = "Determine sentiment as an Integer [-2,2]")
+public class SentimentUdf {
+
+    @Udf(description = "Determine value of String")
+    public Integer sentiment(@UdfParameter("string") final String string) {
+        return getAverageSentiment(string).getValue();
+    }
 
 
-        Sentiment getAverageSentiment(final String string) {
-            if(null == string || string.trim().isEmpty()) {
-                return Sentiment.NEUTRAL;
-            } else {
-                Properties props = new Properties();
-                props.setProperty("annotators", "tokenize, ssplit, parse, sentiment");
-                StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
-                Annotation annotation = pipeline.process(string);
-                List<Sentiment> sentenceSentiments = new ArrayList<>();
+    Sentiment getAverageSentiment(final String string) {
+        if(null == string || string.trim().isEmpty()) {
+            return Sentiment.NEUTRAL;
+        } else {
+            Properties props = new Properties();
+            props.setProperty("annotators", "tokenize, ssplit, parse, sentiment");
+            StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+            Annotation annotation = pipeline.process(string);
+            List<Sentiment> sentenceSentiments = new ArrayList<>();
 
-                for (CoreMap sentence : annotation.get(CoreAnnotations.SentencesAnnotation.class)) {
-                    Tree tree = sentence.get(SentimentCoreAnnotations.SentimentAnnotatedTree.class);
-                    Sentiment sentiment = getSentimentFromPredictedClass(RNNCoreAnnotations.getPredictedClass(tree));
-                    sentenceSentiments.add(sentiment);
-                }
-                long meanSentiment = Math.round(sentenceSentiments.stream().mapToInt(Sentiment::getValue).average().orElse(0));
-                return Sentiment.fromInt((int) meanSentiment);
+            for (CoreMap sentence : annotation.get(CoreAnnotations.SentencesAnnotation.class)) {
+                Tree tree = sentence.get(SentimentCoreAnnotations.SentimentAnnotatedTree.class);
+                Sentiment sentiment = getSentimentFromPredictedClass(RNNCoreAnnotations.getPredictedClass(tree));
+                sentenceSentiments.add(sentiment);
             }
-        }
-
-        Sentiment getSentimentFromPredictedClass(int predictedClass) {
-            switch (predictedClass) {
-                case 0:
-                    return Sentiment.VERY_NEGATIVE;
-                case 1:
-                    return Sentiment.NEGATIVE;
-                case 3:
-                    return Sentiment.POSITIVE;
-                case 4:
-                    return Sentiment.VERY_POSITIVE;
-                default:
-                    return Sentiment.NEUTRAL;
-            }
-        }
-
-        enum Sentiment {
-            VERY_NEGATIVE(-2),
-            NEGATIVE(-1),
-            NEUTRAL(0),
-            POSITIVE(1),
-            VERY_POSITIVE(2);
-
-            private final int value;
-
-            Sentiment(int value) {
-                this.value = value;
-            }
-
-            public int getValue() {
-                return this.value;
-            }
-            private static final Map<Integer, Sentiment> intToTypeMap = new HashMap<Integer, Sentiment>();
-            static {
-                for (Sentiment sentiment : Sentiment.values()) {
-                    intToTypeMap.put(sentiment.value, sentiment);
-                }
-            }
-
-            public static Sentiment fromInt(int i) {
-                return intToTypeMap.get(i);
-            }
+            long meanSentiment = Math.round(sentenceSentiments.stream().mapToInt(Sentiment::getValue).average().orElse(0));
+            return Sentiment.fromInt((int) meanSentiment);
         }
     }
-    ```
+
+    Sentiment getSentimentFromPredictedClass(int predictedClass) {
+        switch (predictedClass) {
+            case 0:
+                return Sentiment.VERY_NEGATIVE;
+            case 1:
+                return Sentiment.NEGATIVE;
+            case 3:
+                return Sentiment.POSITIVE;
+            case 4:
+                return Sentiment.VERY_POSITIVE;
+            default:
+                return Sentiment.NEUTRAL;
+        }
+    }
+
+    enum Sentiment {
+        VERY_NEGATIVE(-2),
+        NEGATIVE(-1),
+        NEUTRAL(0),
+        POSITIVE(1),
+        VERY_POSITIVE(2);
+
+        private final int value;
+
+        Sentiment(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return this.value;
+        }
+        private static final Map<Integer, Sentiment> intToTypeMap = new HashMap<Integer, Sentiment>();
+        static {
+            for (Sentiment sentiment : Sentiment.values()) {
+                intToTypeMap.put(sentiment.value, sentiment);
+            }
+        }
+
+        public static Sentiment fromInt(int i) {
+            return intToTypeMap.get(i);
+        }
+    }
+}
+```
 </details>
 
 Now we can package the JAR and replace our old JAR in the local directory `/home/dan/ksql/udf`.  KSQL will need to be restarted in order to pick up the revamped UDF within new JAR.  Since we haven't edited the `docker-compose.yml` since we last restarted the KSQL container, `docker-compose up -d --build` will not be sufficient on its own.  So let's first explicitly stop the `ksql-server` container.
